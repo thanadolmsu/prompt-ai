@@ -1,1 +1,1843 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptVault - ระบบจัดการ Prompt</title>
+<meta name="description" content="ระบบจัดการ Prompt AI ผ่าน Google Sheets - เก็บ คัดลอก ใช้งาน Prompt ได้ง่าย">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-thai@latest/thai-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-thai@latest/thai-700-normal.css">
+<style>
+  :root {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-input: #ffffff;
+    --border-color: rgba(139, 92, 246, 0.15);
+    --border-strong: rgba(139, 92, 246, 0.3);
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+  }
 
+  [data-theme="dark"] {
+    --bg-primary: #0f0f1a;
+    --bg-secondary: #181828;
+    --bg-tertiary: #1a1a2e;
+    --bg-input: #1a1a2e;
+    --border-color: rgba(139, 92, 246, 0.15);
+    --border-strong: rgba(139, 92, 246, 0.3);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #8b5cf6;
+    --accent-hover: #7c3aed;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --glass-bg: rgba(24, 24, 40, 0.8);
+  }
+
+  * { font-family: 'Noto Sans Thai', sans-serif; }
+  body { 
+    background: var(--bg-primary); 
+    color: var(--text-primary);
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  .glass { 
+    background: var(--glass-bg); 
+    backdrop-filter: blur(16px); 
+    border-bottom: 1px solid var(--border-color); 
+  }
+  .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .card-hover:hover { 
+    transform: translateY(-4px); 
+    box-shadow: 0 20px 40px -15px rgba(139, 92, 246, 0.3); 
+    border-color: var(--border-strong); 
+  }
+  .fade-in { animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .modal-backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px); }
+  [data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, 0.7); }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; opacity: 0.5; }
+  .gradient-bg { background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); }
+  .gradient-text { 
+    background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); 
+    -webkit-background-clip: text; 
+    -webkit-text-fill-color: transparent; 
+    background-clip: text; 
+  }
+  .gradient-border { 
+    background: var(--bg-secondary); 
+    border: 1px solid var(--border-color); 
+    border-radius: 1rem;
+    box-shadow: var(--card-shadow);
+  }
+  .variable-tag { 
+    background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.15)); 
+    border: 1px solid var(--border-strong); 
+    color: var(--accent); 
+  }
+  .prompt-content { white-space: pre-wrap; word-break: break-word; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; line-height: 1.7; }
+  .prompt-content .var { 
+    background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.2)); 
+    color: var(--accent); 
+    padding: 1px 6px; 
+    border-radius: 4px; 
+    font-weight: 600; 
+  }
+  .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.2); }
+  [data-theme="dark"] .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.3); }
+  input, textarea, select { color: var(--text-primary); }
+  input::placeholder, textarea::placeholder { color: var(--text-muted); }
+  .bg-input { 
+    background: var(--bg-input); 
+    border: 1px solid var(--border-color); 
+  }
+  .bg-input:focus { 
+    background: var(--bg-input); 
+    border-color: var(--accent); 
+    outline: none; 
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.15); 
+  }
+  .tab-active { border-bottom: 2px solid var(--accent); color: var(--accent); }
+  .toast { animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .pulse-dot { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .category-chip { transition: all 0.2s; cursor: pointer; }
+  .category-chip:hover { transform: scale(1.05); }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .loading-spinner { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  .theme-toggle {
+    position: relative;
+    width: 56px;
+    height: 28px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .theme-toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 50%;
+    transition: transform 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  [data-theme="dark"] .theme-toggle-slider {
+    transform: translateX(28px);
+  }
+  
+  .admin-tab { transition: all 0.2s; }
+  .admin-tab:hover { background: var(--bg-tertiary); }
+  .admin-tab.active { background: var(--accent); color: white; }
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: all 0.3s;
+  }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .data-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+  }
+  .data-table tr:hover td { background: var(--bg-tertiary); }
+  
+  .chart-bar {
+    background: linear-gradient(to top, var(--accent), #ec4899);
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s;
+  }
+  .chart-bar:hover { opacity: 0.8; }
+
+  .login-input {
+    background: var(--bg-input);
+    border: 2px solid var(--border-color);
+    transition: all 0.3s;
+  }
+  .login-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+  }
+  .login-error { animation: shake 0.5s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  .password-strength-bar {
+    height: 4px;
+    border-radius: 2px;
+    transition: all 0.3s;
+  }
+</style>
+</head>
+<body data-theme="light">
+
+<!-- Toast Container -->
+<div id="toastContainer" class="fixed top-6 right-6 z-[60] space-y-2"></div>
+
+<!-- Header -->
+<header class="sticky top-0 z-30 glass">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-lg glow">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      </div>
+      <div class="hidden sm:block">
+        <h1 class="text-lg font-bold gradient-text">PromptVault</h1>
+        <p class="text-xs" style="color: var(--text-muted)">จัดการ Prompt ผ่าน Google Sheets</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="theme-toggle" onclick="toggleTheme()" title="สลับโหมดสี">
+        <div class="theme-toggle-slider">
+          <svg id="themeIcon" class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+      </div>
+      
+      <div id="connectionStatus" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 pulse-dot"></span>
+        <span class="text-xs font-medium text-amber-600 hidden sm:inline">Local</span>
+      </div>
+      
+      <button onclick="openAdminLogin()" class="p-2 hover:bg-violet-100 rounded-lg" style="color: var(--text-secondary)" title="Admin Panel">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </button>
+      
+      <button onclick="syncFromSheet()" class="p-2 hover:bg-violet-100 rounded-lg" style="color: var(--text-secondary)" title="ซิงค์">
+        <svg id="syncIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+      
+      <button onclick="openPromptModal()" class="px-3 sm:px-4 py-2 text-sm font-semibold text-white gradient-bg rounded-lg flex items-center gap-1.5 shadow-lg glow hover:opacity-90 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">เพิ่ม Prompt</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <!-- Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="gradient-border p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+      </div>
+      <p class="text-xs" style="color: var(--text-muted)">ทั้งหมด</p>
+      <p id="statTotal" class="text-xl font-bold">0</p>
+    </div>
+    <div class="gradient-border p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        </div>
+      </div>
+      <p class="text-xs" style="color: var(--text-muted)">หมวดหมู่</p>
+      <p id="statCategories" class="text-xl font-bold">0</p>
+    </div>
+    <div class="gradient-border p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+      </div>
+      <p class="text-xs" style="color: var(--text-muted)">รายการโปรด</p>
+      <p id="statFavorites" class="text-xl font-bold">0</p>
+    </div>
+    <div class="gradient-border p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+      </div>
+      <p class="text-xs" style="color: var(--text-muted)">ใช้งาน</p>
+      <p id="statUses" class="text-xl font-bold">0</p>
+    </div>
+  </div>
+
+  <!-- Search & Filter -->
+  <div class="gradient-border p-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-2">
+      <div class="relative flex-1">
+        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="searchInput" type="text" placeholder="ค้นหา prompt, หมวดหมู่, แท็ก..." class="w-full pl-9 pr-4 py-2.5 bg-input rounded-lg text-sm">
+      </div>
+      <select id="sortSelect" class="px-3 py-2.5 bg-input rounded-lg text-sm">
+        <option value="newest">ล่าสุด</option>
+        <option value="oldest">เก่าสุด</option>
+        <option value="name">ชื่อ A-Z</option>
+        <option value="uses">ใช้มากที่สุด</option>
+      </select>
+      <button onclick="exportData()" class="px-3 py-2.5 text-sm bg-input rounded-lg hover:bg-violet-100 flex items-center gap-1.5" style="color: var(--text-secondary)" title="Export">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span class="hidden sm:inline">Export</span>
+      </button>
+      <button onclick="document.getElementById('importFile').click()" class="px-3 py-2.5 text-sm bg-input rounded-lg hover:bg-violet-100 flex items-center gap-1.5" style="color: var(--text-secondary)" title="Import">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="hidden sm:inline">Import</span>
+      </button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(event)">
+    </div>
+    <div id="categoryChips" class="flex flex-wrap gap-2 mt-3"></div>
+  </div>
+
+  <!-- Prompts Grid -->
+  <div id="promptsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+  <!-- Empty State -->
+  <div id="emptyState" class="hidden gradient-border p-12 text-center">
+    <div class="w-20 h-20 mx-auto rounded-full bg-violet-500/10 flex items-center justify-center mb-4">
+      <svg class="w-10 h-10 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+    </div>
+    <h3 class="text-lg font-bold mb-2">ยังไม่มี Prompt ในระบบ</h3>
+    <p class="text-sm mb-6" style="color: var(--text-muted)">เริ่มต้นสร้าง Prompt แรกของคุณ</p>
+    <div class="flex gap-3 justify-center flex-wrap">
+      <button onclick="openPromptModal()" class="px-5 py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-lg glow">สร้าง Prompt ใหม่</button>
+      <button onclick="openAdminLogin()" class="px-5 py-2.5 text-sm font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">🔐 เปิด Admin Panel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="rounded-2xl shadow-2xl w-full max-w-md fade-in overflow-hidden" style="background: var(--bg-secondary); border: 1px solid var(--border-color)">
+    <div class="p-8 text-center" style="background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.1)); border-bottom: 1px solid var(--border-color)">
+      <div class="w-16 h-16 mx-auto rounded-2xl gradient-bg flex items-center justify-center shadow-lg glow mb-4">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <h2 class="text-2xl font-bold gradient-text">Admin Login</h2>
+      <p class="text-sm mt-1" style="color: var(--text-muted)">กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</p>
+    </div>
+    <form id="loginForm" class="p-8 space-y-4" onsubmit="handleLogin(event)">
+      <div>
+        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary)">🔑 รหัสผ่าน</label>
+        <div class="relative">
+          <input id="loginPassword" type="password" placeholder="ใส่รหัสผ่าน..." class="login-input w-full px-4 py-3 pr-12 rounded-lg text-sm" required autofocus>
+          <button type="button" onclick="togglePasswordVisibility('loginPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 p-1" style="color: var(--text-muted)">
+            <svg class="w-5 h-5 eye-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="loginError" class="hidden p-3 rounded-lg text-sm" style="background: rgba(239, 68, 68, 0.1); color: #ef4444">
+        ❌ รหัสผ่านไม่ถูกต้อง
+      </div>
+      <div id="loginLoading" class="hidden text-center py-2">
+        <svg class="w-6 h-6 mx-auto loading-spinner" style="color: var(--accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <p class="text-xs mt-2" style="color: var(--text-muted)">กำลังตรวจสอบ...</p>
+      </div>
+      <button type="submit" id="loginBtn" class="w-full py-3 text-sm font-semibold text-white gradient-bg rounded-lg shadow-lg glow hover:opacity-90 transition">
+        🔓 เข้าสู่ระบบ
+      </button>
+      <div class="flex items-center justify-between pt-2">
+        <button type="button" onclick="closeLoginModal()" class="text-sm hover:underline" style="color: var(--text-muted)">ยกเลิก</button>
+        <div class="text-xs" style="color: var(--text-muted)">
+          💡 รหัสเริ่มต้น: <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-tertiary)">admin123</code>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Prompt Modal -->
+<div id="promptModal" class="hidden fixed inset-0 z-40 modal-backdrop flex items-center justify-center p-4">
+  <div class="rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-thin fade-in" style="background: var(--bg-secondary); border: 1px solid var(--border-color)">
+    <div class="p-5 flex items-center justify-between sticky top-0 z-10" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color)">
+      <h3 id="modalTitle" class="text-lg font-bold">สร้าง Prompt ใหม่</h3>
+      <button onclick="closePromptModal()" class="p-1 hover:bg-violet-100 rounded-lg" style="color: var(--text-muted)">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="promptForm" class="p-5 space-y-4">
+      <input type="hidden" id="promptId">
+      <div>
+        <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">ชื่อ Prompt *</label>
+        <input id="promptTitle" type="text" required placeholder="เช่น เขียนบทความ SEO" class="w-full px-4 py-2.5 bg-input rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">คำอธิบาย</label>
+        <input id="promptDesc" type="text" placeholder="อธิบายสั้นๆ" class="w-full px-4 py-2.5 bg-input rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1.5 flex items-center justify-between" style="color: var(--text-secondary)">
+          <span>เนื้อหา Prompt *</span>
+          <span class="text-xs" style="color: var(--text-muted)">ใช้ <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-tertiary); color: var(--accent)">{{variable}}</code></span>
+        </label>
+        <textarea id="promptContent" rows="8" required placeholder="คุณเป็นผู้เชี่ยวชาญ...&#10;&#10;โปรดเขียน {{topic}}..." class="w-full px-4 py-2.5 bg-input rounded-lg text-sm font-mono resize-none"></textarea>
+      </div>
+      <div id="variablesPreview" class="hidden">
+        <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">ตัวแปรที่ตรวจพบ</label>
+        <div id="variablesList" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">หมวดหมู่</label>
+          <input id="promptCategory" type="text" placeholder="เช่น Marketing" list="categoryList" class="w-full px-4 py-2.5 bg-input rounded-lg text-sm">
+          <datalist id="categoryList"></datalist>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">แท็ก</label>
+          <input id="promptTags" type="text" placeholder="คั่นด้วย , " class="w-full px-4 py-2.5 bg-input rounded-lg text-sm">
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="promptFavorite" type="checkbox" class="w-4 h-4 rounded text-violet-600">
+        <label for="promptFavorite" class="text-sm" style="color: var(--text-secondary)">⭐ เพิ่มในรายการโปรด</label>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closePromptModal()" class="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">ยกเลิก</button>
+        <button type="submit" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-lg glow">บันทึก</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- View Prompt Modal -->
+<div id="viewModal" class="hidden fixed inset-0 z-40 modal-backdrop flex items-center justify-center p-4">
+  <div class="rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto scrollbar-thin fade-in" style="background: var(--bg-secondary); border: 1px solid var(--border-color)">
+    <div class="p-5 flex items-center justify-between sticky top-0 z-10" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color)">
+      <div class="flex-1 min-w-0">
+        <h3 id="viewTitle" class="text-lg font-bold truncate"></h3>
+        <p id="viewDesc" class="text-xs mt-0.5 truncate" style="color: var(--text-muted)"></p>
+      </div>
+      <button onclick="closeViewModal()" class="p-1 hover:bg-violet-100 rounded-lg ml-3" style="color: var(--text-muted)">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div id="viewVariables" class="hidden">
+        <label class="block text-sm font-medium mb-2" style="color: var(--text-secondary)">🔧 ตัวแปร (กรอกค่าเพื่อแทนที่)</label>
+        <div id="viewVariablesInputs" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-medium" style="color: var(--text-secondary)">เนื้อหา Prompt</label>
+          <div class="flex gap-2">
+            <button onclick="copyProcessedPrompt()" class="px-3 py-1.5 text-xs font-semibold text-white gradient-bg rounded-lg">📋 คัดลอก (แทนที่)</button>
+            <button onclick="copyRawPrompt()" class="px-3 py-1.5 text-xs rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">📄 ต้นฉบับ</button>
+          </div>
+        </div>
+        <div id="viewContent" class="prompt-content rounded-xl p-4 max-h-96 overflow-y-auto scrollbar-thin" style="background: var(--bg-primary); border: 1px solid var(--border-color)"></div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button onclick="editFromView()" class="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2" style="background: var(--bg-tertiary); color: var(--text-primary)">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          แก้ไข
+        </button>
+        <button onclick="usePrompt()" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-lg glow flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          ใช้งาน & คัดลอก
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="rounded-2xl shadow-2xl w-full max-w-sm p-6 fade-in" style="background: var(--bg-secondary); border: 1px solid var(--border-color)">
+    <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-4" style="background: rgba(239, 68, 68, 0.1)">
+      <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+    <h3 class="text-lg font-bold text-center mb-2">ยืนยันการลบ</h3>
+    <p class="text-sm text-center mb-6" style="color: var(--text-muted)">ต้องการลบ prompt นี้หรือไม่?</p>
+    <div class="flex gap-3">
+      <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">ยกเลิก</button>
+      <button onclick="confirmDelete()" class="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-lg hover:bg-rose-600">ลบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Panel Modal -->
+<div id="adminPanel" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden fade-in flex flex-col" style="background: var(--bg-secondary); border: 1px solid var(--border-color)">
+    <div class="p-5 flex items-center justify-between flex-shrink-0" style="border-bottom: 1px solid var(--border-color)">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-lg">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold gradient-text">Admin Panel</h2>
+          <p class="text-xs" style="color: var(--text-muted)">ระบบบริหารจัดการหลังบ้าน</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="logoutAdmin()" class="px-3 py-1.5 text-xs font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)" title="ออกจากระบบ">
+          🚪 ออก
+        </button>
+        <button onclick="closeAdminPanel()" class="p-2 hover:bg-violet-100 rounded-lg" style="color: var(--text-muted)">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="flex gap-1 px-5 pt-3 flex-shrink-0 overflow-x-auto" style="border-bottom: 1px solid var(--border-color)">
+      <button onclick="switchAdminTab('overview')" id="adminTabOverview" class="admin-tab active px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap">📊 ภาพรวม</button>
+      <button onclick="switchAdminTab('prompts')" id="adminTabPrompts" class="admin-tab px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap" style="color: var(--text-secondary)">📝 จัดการ Prompts</button>
+      <button onclick="switchAdminTab('categories')" id="adminTabCategories" class="admin-tab px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap" style="color: var(--text-secondary)">📂 หมวดหมู่</button>
+      <button onclick="switchAdminTab('security')" id="adminTabSecurity" class="admin-tab px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap" style="color: var(--text-secondary)">🔐 ความปลอดภัย</button>
+      <button onclick="switchAdminTab('settings')" id="adminTabSettings" class="admin-tab px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap" style="color: var(--text-secondary)">⚙️ ตั้งค่า</button>
+      <button onclick="switchAdminTab('logs')" id="adminTabLogs" class="admin-tab px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap" style="color: var(--text-secondary)">📜 Logs</button>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto scrollbar-thin p-5">
+      <!-- Overview -->
+      <div id="adminContentOverview" class="space-y-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="stat-card">
+            <p class="text-xs" style="color: var(--text-muted)">Prompts ทั้งหมด</p>
+            <p id="adminStatTotal" class="text-2xl font-bold mt-1">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs" style="color: var(--text-muted)">การใช้งาน</p>
+            <p id="adminStatUses" class="text-2xl font-bold mt-1">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs" style="color: var(--text-muted)">หมวดหมู่</p>
+            <p id="adminStatCategories" class="text-2xl font-bold mt-1">0</p>
+          </div>
+          <div class="stat-card">
+            <p class="text-xs" style="color: var(--text-muted)">รายการโปรด</p>
+            <p id="adminStatFavorites" class="text-2xl font-bold mt-1">0</p>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="gradient-border p-5">
+            <h3 class="font-bold mb-4">📊 หมวดหมู่ยอดนิยม</h3>
+            <div id="categoryChart" class="space-y-3"></div>
+          </div>
+          <div class="gradient-border p-5">
+            <h3 class="font-bold mb-4">🔥 ใช้มากที่สุด</h3>
+            <div id="topUsedChart" class="space-y-2"></div>
+          </div>
+        </div>
+        
+        <div class="gradient-border p-5">
+          <h3 class="font-bold mb-4">⚡ การดำเนินการด่วน</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button onclick="adminSeedSample()" class="p-4 rounded-lg text-left hover:bg-violet-100 transition" style="background: var(--bg-tertiary)">
+              <div class="text-2xl mb-2">🌱</div>
+              <p class="font-medium text-sm">สร้างข้อมูลตัวอย่าง</p>
+              <p class="text-xs mt-1" style="color: var(--text-muted)">5 prompts</p>
+            </button>
+            <button onclick="adminClearAll()" class="p-4 rounded-lg text-left hover:bg-rose-100 transition" style="background: var(--bg-tertiary)">
+              <div class="text-2xl mb-2">🗑️</div>
+              <p class="font-medium text-sm">ลบข้อมูลทั้งหมด</p>
+              <p class="text-xs mt-1" style="color: var(--text-muted)">ล้างระบบ</p>
+            </button>
+            <button onclick="exportData()" class="p-4 rounded-lg text-left hover:bg-emerald-100 transition" style="background: var(--bg-tertiary)">
+              <div class="text-2xl mb-2">💾</div>
+              <p class="font-medium text-sm">Export</p>
+              <p class="text-xs mt-1" style="color: var(--text-muted)">JSON</p>
+            </button>
+            <button onclick="document.getElementById('importFile').click()" class="p-4 rounded-lg text-left hover:bg-blue-100 transition" style="background: var(--bg-tertiary)">
+              <div class="text-2xl mb-2">📥</div>
+              <p class="font-medium text-sm">Import</p>
+              <p class="text-xs mt-1" style="color: var(--text-muted)">JSON</p>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Prompts Management -->
+      <div id="adminContentPrompts" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold">จัดการ Prompts ทั้งหมด</h3>
+          <div class="flex gap-2">
+            <input id="adminSearchInput" type="text" placeholder="ค้นหา..." class="px-3 py-2 bg-input rounded-lg text-sm" oninput="renderAdminPrompts()">
+            <button onclick="openPromptModal()" class="px-4 py-2 text-sm font-semibold text-white gradient-bg rounded-lg">+ เพิ่มใหม่</button>
+          </div>
+        </div>
+        <div class="gradient-border overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ชื่อ</th>
+                  <th>หมวดหมู่</th>
+                  <th>ใช้งาน</th>
+                  <th>โปรด</th>
+                  <th>สร้างเมื่อ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="adminPromptsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Categories -->
+      <div id="adminContentCategories" class="hidden">
+        <h3 class="font-bold mb-4">จัดการหมวดหมู่</h3>
+        <div id="adminCategoriesList" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+      
+      <!-- Security -->
+      <div id="adminContentSecurity" class="hidden space-y-4">
+        <div class="gradient-border p-5">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: rgba(139,92,246,0.1)">
+              <svg class="w-5 h-5" style="color: var(--accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            </div>
+            <div>
+              <h3 class="font-bold">เปลี่ยนรหัสผ่าน Admin</h3>
+              <p class="text-xs" style="color: var(--text-muted)">รหัสผ่านจะถูกเก็บใน Google Sheets (Settings Sheet)</p>
+            </div>
+          </div>
+          
+          <form onsubmit="handleChangePassword(event)" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">🔑 รหัสผ่านปัจจุบัน *</label>
+              <div class="relative">
+                <input id="currentPassword" type="password" required class="login-input w-full px-4 py-2.5 pr-12 rounded-lg text-sm" placeholder="ใส่รหัสผ่านปัจจุบัน">
+                <button type="button" onclick="togglePasswordVisibility('currentPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 p-1" style="color: var(--text-muted)">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">🆕 รหัสผ่านใหม่ *</label>
+              <div class="relative">
+                <input id="newPassword" type="password" required minlength="4" class="login-input w-full px-4 py-2.5 pr-12 rounded-lg text-sm" placeholder="ใส่รหัสผ่านใหม่ (อย่างน้อย 4 ตัว)" oninput="checkPasswordStrength(this.value)">
+                <button type="button" onclick="togglePasswordVisibility('newPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 p-1" style="color: var(--text-muted)">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+              </div>
+              <div class="mt-2">
+                <div class="flex gap-1">
+                  <div id="strength1" class="password-strength-bar flex-1" style="background: var(--bg-tertiary)"></div>
+                  <div id="strength2" class="password-strength-bar flex-1" style="background: var(--bg-tertiary)"></div>
+                  <div id="strength3" class="password-strength-bar flex-1" style="background: var(--bg-tertiary)"></div>
+                  <div id="strength4" class="password-strength-bar flex-1" style="background: var(--bg-tertiary)"></div>
+                </div>
+                <p id="strengthText" class="text-xs mt-1" style="color: var(--text-muted)">ความแข็งแรง: -</p>
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">✅ ยืนยันรหัสผ่านใหม่ *</label>
+              <div class="relative">
+                <input id="confirmPassword" type="password" required minlength="4" class="login-input w-full px-4 py-2.5 pr-12 rounded-lg text-sm" placeholder="ใส่รหัสผ่านใหม่อีกครั้ง">
+                <button type="button" onclick="togglePasswordVisibility('confirmPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 p-1" style="color: var(--text-muted)">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div id="passwordChangeResult" class="hidden"></div>
+            
+            <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-lg glow hover:opacity-90 transition">
+              🔐 เปลี่ยนรหัสผ่าน
+            </button>
+          </form>
+        </div>
+        
+        <div class="gradient-border p-5">
+          <h3 class="font-bold mb-3">💡 คำแนะนำ</h3>
+          <ul class="space-y-2 text-sm" style="color: var(--text-secondary)">
+            <li>• รหัสผ่านจะถูกเก็บใน Google Sheets ของคุณ (Settings Sheet)</li>
+            <li>• สามารถแก้ไขโดยตรงใน Google Sheets ได้เลย</li>
+            <li>• ความยาวขั้นต่ำ 4 ตัวอักษร</li>
+            <li>• แนะนำให้ใช้ตัวอักษรผสมตัวเลขและอักขระพิเศษ</li>
+            <li>• รหัสเริ่มต้น: <code class="px-1.5 py-0.5 rounded" style="background: var(--bg-tertiary); color: var(--accent)">admin123</code></li>
+          </ul>
+        </div>
+      </div>
+      
+      <!-- Settings -->
+      <div id="adminContentSettings" class="hidden space-y-4">
+        <div class="gradient-border p-5">
+          <h3 class="font-bold mb-4">🔗 การเชื่อมต่อ Google Sheets</h3>
+          <div>
+            <label class="block text-sm font-medium mb-1.5" style="color: var(--text-secondary)">Web App URL</label>
+            <input id="adminApiUrl" type="url" placeholder="https://script.google.com/macros/s/..." class="w-full px-4 py-2.5 bg-input rounded-lg text-sm">
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button onclick="adminSaveApiUrl()" class="px-4 py-2 text-sm font-semibold text-white gradient-bg rounded-lg">บันทึก & เชื่อมต่อ</button>
+            <button onclick="adminDisconnect()" class="px-4 py-2 text-sm font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">ยกเลิก</button>
+          </div>
+          <div id="adminConnectionResult" class="hidden mt-3"></div>
+        </div>
+        
+        <div class="gradient-border p-5">
+          <h3 class="font-bold mb-4">🎨 การแสดงผล</h3>
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium">โหมดสี</p>
+              <p class="text-xs" style="color: var(--text-muted)">สลับระหว่างโหมดมืดและสว่าง</p>
+            </div>
+            <div class="theme-toggle" onclick="toggleTheme()">
+              <div class="theme-toggle-slider">
+                <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="gradient-border p-5">
+          <h3 class="font-bold mb-4">ℹ️ ข้อมูลระบบ</h3>
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span style="color: var(--text-muted)">เวอร์ชัน</span>
+              <span class="font-medium">2.1.0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span style="color: var(--text-muted)">โหมด</span>
+              <span id="adminSettingsMode" class="font-medium">-</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span style="color: var(--text-muted)">จำนวน Prompts</span>
+              <span id="adminSettingsCount" class="font-medium">-</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span style="color: var(--text-muted)">ซิงค์ล่าสุด</span>
+              <span id="adminSettingsLastSync" class="font-medium">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Logs -->
+      <div id="adminContentLogs" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold">บันทึกการใช้งาน</h3>
+          <button onclick="adminClearLogs()" class="px-3 py-1.5 text-xs font-medium rounded-lg" style="background: var(--bg-tertiary); color: var(--text-primary)">ล้าง Logs</button>
+        </div>
+        <div class="gradient-border overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>เวลา</th>
+                  <th>การกระทำ</th>
+                  <th>Item ID</th>
+                  <th>รายละเอียด</th>
+                </tr>
+              </thead>
+              <tbody id="adminLogsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PromptVault v2.1 - Frontend Application
+// ============================================================
+
+let prompts = [];
+let currentFilter = 'all';
+let currentSearch = '';
+let currentSort = 'newest';
+let deleteTargetId = null;
+let currentViewId = null;
+let apiUrl = localStorage.getItem('promptvault_api_url') || '';
+let isSyncing = false;
+let adminStats = null;
+let adminPassword = null;
+
+// ============ Theme ============
+function initTheme() {
+  const saved = localStorage.getItem('promptvault_theme') || 'light';
+  document.body.setAttribute('data-theme', saved);
+  updateThemeIcon();
+}
+
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', next);
+  localStorage.setItem('promptvault_theme', next);
+  updateThemeIcon();
+  showToast(`เปลี่ยนเป็นโหมด${next === 'dark' ? 'มืด' : 'สว่าง'}`, 'success');
+}
+
+function updateThemeIcon() {
+  const theme = document.body.getAttribute('data-theme');
+  const icon = document.getElementById('themeIcon');
+  if (theme === 'dark') {
+    icon.innerHTML = '<path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>';
+  } else {
+    icon.innerHTML = '<path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>';
+  }
+}
+
+// ============ Password Visibility ============
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  const icon = btn.querySelector('.eye-icon') || btn.querySelector('svg');
+  if (isPassword) {
+    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+  } else {
+    icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+  }
+}
+
+// ============ Password Strength ============
+function checkPasswordStrength(password) {
+  let strength = 0;
+  if (password.length >= 4) strength++;
+  if (password.length >= 8) strength++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
+  if (/[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password)) strength++;
+  
+  const colors = ['#ef4444', '#f59e0b', '#eab308', '#10b981'];
+  const labels = ['อ่อนแอ', 'ปานกลาง', 'ดี', 'แข็งแรง'];
+  
+  for (let i = 1; i <= 4; i++) {
+    const bar = document.getElementById('strength' + i);
+    bar.style.background = i <= strength ? colors[strength - 1] : 'var(--bg-tertiary)';
+  }
+  
+  document.getElementById('strengthText').textContent = 'ความแข็งแรง: ' + (strength > 0 ? labels[strength - 1] : '-');
+  document.getElementById('strengthText').style.color = strength > 0 ? colors[strength - 1] : 'var(--text-muted)';
+}
+
+// ============ Init ============
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  loadFromLocal();
+  if (apiUrl) {
+    syncFromSheet();
+  } else {
+    renderPrompts();
+    updateConnectionStatus(false);
+  }
+  
+  document.getElementById('searchInput').addEventListener('input', e => {
+    currentSearch = e.target.value.toLowerCase();
+    renderPrompts();
+  });
+  
+  document.getElementById('sortSelect').addEventListener('change', e => {
+    currentSort = e.target.value;
+    renderPrompts();
+  });
+  
+  document.getElementById('promptForm').addEventListener('submit', handleFormSubmit);
+  document.getElementById('promptContent').addEventListener('input', updateVariablesPreview);
+});
+
+// ============ Login ============
+function openAdminLogin() {
+  if (adminPassword) {
+    openAdminPanel();
+    return;
+  }
+  document.getElementById('loginModal').classList.remove('hidden');
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').classList.add('hidden');
+  document.getElementById('loginLoading').classList.add('hidden');
+  document.getElementById('loginBtn').disabled = false;
+  setTimeout(() => document.getElementById('loginPassword').focus(), 100);
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').classList.add('hidden');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const password = document.getElementById('loginPassword').value;
+  const errorEl = document.getElementById('loginError');
+  const loadingEl = document.getElementById('loginLoading');
+  const btn = document.getElementById('loginBtn');
+  
+  errorEl.classList.add('hidden');
+  loadingEl.classList.remove('hidden');
+  btn.disabled = true;
+  
+  if (apiUrl) {
+    try {
+      const res = await fetch(apiUrl + '?action=checkPassword&password=' + encodeURIComponent(password));
+      const json = await res.json();
+      
+      if (json.success && json.data.valid) {
+        adminPassword = password;
+        loadingEl.classList.add('hidden');
+        closeLoginModal();
+        showToast('🔓 เข้าสู่ระบบสำเร็จ', 'success');
+        setTimeout(() => openAdminPanel(), 300);
+      } else {
+        loadingEl.classList.add('hidden');
+        btn.disabled = false;
+        errorEl.textContent = '❌ ' + (json.data.message || 'รหัสผ่านไม่ถูกต้อง');
+        errorEl.classList.remove('hidden');
+        errorEl.classList.add('login-error');
+        setTimeout(() => errorEl.classList.remove('login-error'), 500);
+      }
+    } catch (err) {
+      loadingEl.classList.add('hidden');
+      btn.disabled = false;
+      errorEl.textContent = '❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้';
+      errorEl.classList.remove('hidden');
+    }
+  } else {
+    if (password === 'admin123') {
+      adminPassword = password;
+      loadingEl.classList.add('hidden');
+      closeLoginModal();
+      showToast('🔓 เข้าสู่ระบบสำเร็จ (Local Mode)', 'success');
+      setTimeout(() => openAdminPanel(), 300);
+    } else {
+      loadingEl.classList.add('hidden');
+      btn.disabled = false;
+      errorEl.textContent = '❌ รหัสผ่านไม่ถูกต้อง (Local: admin123)';
+      errorEl.classList.remove('hidden');
+      errorEl.classList.add('login-error');
+      setTimeout(() => errorEl.classList.remove('login-error'), 500);
+    }
+  }
+}
+
+function logoutAdmin() {
+  if (!confirm('ต้องการออกจากระบบ Admin?')) return;
+  adminPassword = null;
+  closeAdminPanel();
+  showToast('🚪 ออกจากระบบแล้ว', 'info');
+}
+
+// ============ API ============
+async function syncFromSheet() {
+  if (!apiUrl || isSyncing) return;
+  isSyncing = true;
+  
+  const syncIcon = document.getElementById('syncIcon');
+  syncIcon.classList.add('loading-spinner');
+  
+  try {
+    const res = await fetch(apiUrl + '?action=list');
+    const json = await res.json();
+    
+    if (json.success) {
+      prompts = json.data || [];
+      saveToLocal();
+      localStorage.setItem('promptvault_last_sync', new Date().toISOString());
+      updateConnectionStatus(true);
+      showToast(`ซิงค์สำเร็จ ${prompts.length} รายการ`, 'success');
+    } else {
+      throw new Error(json.error);
+    }
+  } catch (err) {
+    console.error('Sync error:', err);
+    updateConnectionStatus(false);
+    showToast('ซิงค์ไม่สำเร็จ ใช้ข้อมูลในเครื่อง', 'warning');
+  }
+  
+  isSyncing = false;
+  syncIcon.classList.remove('loading-spinner');
+  renderPrompts();
+}
+
+async function apiCall(action, payload) {
+  if (!apiUrl) return false;
+  try {
+    const body = { action, ...payload };
+    if (adminPassword) body.password = adminPassword;
+    
+    await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body)
+    });
+    return true;
+  } catch (err) {
+    console.error('API error:', err);
+    return false;
+  }
+}
+
+function updateConnectionStatus(connected) {
+  const el = document.getElementById('connectionStatus');
+  if (connected) {
+    el.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot"></span><span class="text-xs font-medium text-emerald-600 hidden sm:inline">เชื่อมต่อแล้ว</span>';
+  } else if (apiUrl) {
+    el.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span class="text-xs font-medium text-rose-600 hidden sm:inline">ออฟไลน์</span>';
+  } else {
+    el.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"></span><span class="text-xs font-medium text-amber-600 hidden sm:inline">Local</span>';
+  }
+}
+
+// ============ Local Storage ============
+function loadFromLocal() {
+  const saved = localStorage.getItem('promptvault_prompts');
+  if (saved) prompts = JSON.parse(saved);
+}
+
+function saveToLocal() {
+  localStorage.setItem('promptvault_prompts', JSON.stringify(prompts));
+}
+
+// ============ Variables ============
+function extractVariables(content) {
+  if (!content) return [];
+  const matches = content.match(/\{\{([^}]+)\}\}/g);
+  if (!matches) return [];
+  return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '').trim()))];
+}
+
+function updateVariablesPreview() {
+  const content = document.getElementById('promptContent').value;
+  const vars = extractVariables(content);
+  const preview = document.getElementById('variablesPreview');
+  const list = document.getElementById('variablesList');
+  
+  if (vars.length === 0) { preview.classList.add('hidden'); return; }
+  
+  preview.classList.remove('hidden');
+  list.innerHTML = vars.map(v => 
+    `<span class="variable-tag px-3 py-1 rounded-full text-xs font-medium">{{${escapeHtml(v)}}}</span>`
+  ).join('');
+}
+
+function highlightVariables(content) {
+  return escapeHtml(content).replace(/\{\{([^}]+)\}\}/g, '<span class="var">{{$1}}</span>');
+}
+
+function processPrompt(content, variables) {
+  let result = content;
+  Object.keys(variables).forEach(key => {
+    if (variables[key]) {
+      const regex = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\}\\}`, 'g');
+      result = result.replace(regex, variables[key]);
+    }
+  });
+  return result;
+}
+
+// ============ Render ============
+function renderPrompts() {
+  const grid = document.getElementById('promptsGrid');
+  const empty = document.getElementById('emptyState');
+  
+  let filtered = prompts.filter(p => {
+    const matchCat = currentFilter === 'all' || p.category === currentFilter;
+    const matchSearch = !currentSearch || 
+      (p.title || '').toLowerCase().includes(currentSearch) ||
+      (p.description || '').toLowerCase().includes(currentSearch) ||
+      (p.tags || '').toLowerCase().includes(currentSearch) ||
+      (p.content || '').toLowerCase().includes(currentSearch);
+    return matchCat && matchSearch;
+  });
+  
+  filtered.sort((a, b) => {
+    if (currentSort === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+    if (currentSort === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+    if (currentSort === 'name') return (a.title || '').localeCompare(b.title || '', 'th');
+    if (currentSort === 'uses') return (parseInt(b.useCount) || 0) - (parseInt(a.useCount) || 0);
+    return 0;
+  });
+  
+  if (filtered.length === 0) {
+    grid.classList.add('hidden');
+    empty.classList.remove('hidden');
+  } else {
+    grid.classList.remove('hidden');
+    empty.classList.add('hidden');
+    grid.innerHTML = filtered.map(p => renderCard(p)).join('');
+  }
+  
+  renderCategoryChips();
+  updateStats();
+}
+
+function renderCard(prompt) {
+  const colors = ['from-violet-500 to-purple-500', 'from-pink-500 to-rose-500', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-emerald-500 to-teal-500', 'from-fuchsia-500 to-pink-500'];
+  const colorIdx = Math.abs(hashCode(prompt.category || prompt.title)) % colors.length;
+  const initial = (prompt.title || '?').charAt(0).toUpperCase();
+  const date = new Date(prompt.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+  const isFav = String(prompt.favorite) === 'true';
+  const vars = extractVariables(prompt.content);
+  const preview = (prompt.content || '').substring(0, 150).replace(/\{\{([^}]+)\}\}/g, '[$1]');
+  
+  return `
+    <div class="card-hover gradient-border overflow-hidden fade-in">
+      <div class="p-5">
+        <div class="flex items-start gap-3 mb-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br ${colors[colorIdx]} flex items-center justify-center text-white font-bold text-lg shadow-lg flex-shrink-0">${initial}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-bold truncate">${escapeHtml(prompt.title)}</h3>
+              <button onclick="toggleFavorite('${prompt.id}'); event.stopPropagation();" class="text-lg flex-shrink-0 hover:scale-125 transition">${isFav ? '⭐' : '☆'}</button>
+            </div>
+            ${prompt.description ? `<p class="text-xs truncate mt-0.5" style="color: var(--text-muted)">${escapeHtml(prompt.description)}</p>` : ''}
+          </div>
+        </div>
+        <div class="rounded-lg p-3 mb-3" style="background: var(--bg-primary); border: 1px solid var(--border-color)">
+          <p class="text-xs line-clamp-3 font-mono leading-relaxed" style="color: var(--text-muted)">${escapeHtml(preview)}${(prompt.content || '').length > 150 ? '...' : ''}</p>
+        </div>
+        ${vars.length > 0 ? `<div class="flex flex-wrap gap-1.5 mb-3">${vars.slice(0, 5).map(v => `<span class="variable-tag px-2 py-0.5 text-xs rounded-full">${escapeHtml(v)}</span>`).join('')}${vars.length > 5 ? `<span class="text-xs self-center" style="color: var(--text-muted)">+${vars.length - 5}</span>` : ''}</div>` : ''}
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          ${prompt.category ? `<span class="px-2 py-0.5 text-xs font-medium rounded-full" style="background: rgba(139,92,246,0.15); color: var(--accent)">${escapeHtml(prompt.category)}</span>` : ''}
+          ${(prompt.tags || '').split(',').filter(t => t.trim()).slice(0, 3).map(t => `<span class="px-2 py-0.5 text-xs rounded-full" style="background: var(--bg-tertiary); color: var(--text-muted)">${escapeHtml(t.trim())}</span>`).join('')}
+        </div>
+        <div class="flex items-center justify-between text-xs pt-3" style="color: var(--text-muted); border-top: 1px solid var(--border-color)">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1">⚡ ${prompt.useCount || 0}</span>
+            <span>${date}</span>
+          </div>
+          <div class="flex items-center gap-0.5">
+            <button onclick="viewPrompt('${prompt.id}'); event.stopPropagation();" class="p-1.5 hover:bg-violet-100 rounded-lg" title="ดู">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </button>
+            <button onclick="quickCopy('${prompt.id}'); event.stopPropagation();" class="p-1.5 hover:bg-violet-100 rounded-lg" title="คัดลอก">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+            </button>
+            <button onclick="editPrompt('${prompt.id}'); event.stopPropagation();" class="p-1.5 hover:bg-violet-100 rounded-lg" title="แก้ไข">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button onclick="openDeleteModal('${prompt.id}'); event.stopPropagation();" class="p-1.5 hover:bg-rose-100 rounded-lg" title="ลบ">
+              <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <button onclick="viewPrompt('${prompt.id}')" class="w-full px-5 py-2.5 text-center text-sm font-semibold transition flex items-center justify-center gap-2" style="background: var(--bg-tertiary); color: var(--accent)">
+        ⚡ ใช้งาน Prompt
+      </button>
+    </div>
+  `;
+}
+
+function renderCategoryChips() {
+  const categories = [...new Set(prompts.map(p => p.category).filter(Boolean))];
+  const container = document.getElementById('categoryChips');
+  const counts = {};
+  prompts.forEach(p => { if (p.category) counts[p.category] = (counts[p.category] || 0) + 1; });
+  
+  container.innerHTML = `
+    <button onclick="filterByCategory('all')" class="category-chip ${currentFilter === 'all' ? 'gradient-bg text-white' : ''} px-3 py-1 text-sm font-medium rounded-full" style="${currentFilter !== 'all' ? 'background: var(--bg-tertiary); color: var(--text-primary)' : ''}">ทั้งหมด <span class="opacity-75">${prompts.length}</span></button>
+    ${categories.map(cat => `
+      <button onclick="filterByCategory('${escapeHtml(cat)}')" class="category-chip ${currentFilter === cat ? 'gradient-bg text-white' : ''} px-3 py-1 text-sm font-medium rounded-full" style="${currentFilter !== cat ? 'background: var(--bg-tertiary); color: var(--text-primary)' : ''}">${escapeHtml(cat)} <span class="opacity-75">${counts[cat] || 0}</span></button>
+    `).join('')}
+  `;
+  
+  document.getElementById('categoryList').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = prompts.length;
+  document.getElementById('statCategories').textContent = [...new Set(prompts.map(p => p.category).filter(Boolean))].length;
+  document.getElementById('statFavorites').textContent = prompts.filter(p => String(p.favorite) === 'true').length;
+  document.getElementById('statUses').textContent = prompts.reduce((s, p) => s + (parseInt(p.useCount) || 0), 0);
+}
+
+// ============ Actions ============
+function filterByCategory(cat) { currentFilter = cat; renderPrompts(); }
+
+function openPromptModal(prompt = null) {
+  document.getElementById('promptModal').classList.remove('hidden');
+  document.getElementById('modalTitle').textContent = prompt ? 'แก้ไข Prompt' : 'สร้าง Prompt ใหม่';
+  document.getElementById('promptForm').reset();
+  document.getElementById('variablesPreview').classList.add('hidden');
+  
+  if (prompt) {
+    document.getElementById('promptId').value = prompt.id;
+    document.getElementById('promptTitle').value = prompt.title;
+    document.getElementById('promptDesc').value = prompt.description || '';
+    document.getElementById('promptContent').value = prompt.content;
+    document.getElementById('promptCategory').value = prompt.category || '';
+    document.getElementById('promptTags').value = prompt.tags || '';
+    document.getElementById('promptFavorite').checked = String(prompt.favorite) === 'true';
+    updateVariablesPreview();
+  }
+}
+
+function closePromptModal() { document.getElementById('promptModal').classList.add('hidden'); }
+
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('promptId').value;
+  const prompt = {
+    id: id || 'prm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    title: document.getElementById('promptTitle').value.trim(),
+    description: document.getElementById('promptDesc').value.trim(),
+    content: document.getElementById('promptContent').value,
+    category: document.getElementById('promptCategory').value.trim(),
+    tags: document.getElementById('promptTags').value.trim(),
+    favorite: document.getElementById('promptFavorite').checked ? 'true' : 'false'
+  };
+  
+  if (id) {
+    const idx = prompts.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      prompt.createdAt = prompts[idx].createdAt;
+      prompt.useCount = prompts[idx].useCount || 0;
+      prompt.updatedAt = new Date().toISOString();
+      prompts[idx] = prompt;
+    }
+    await apiCall('update', { prompt });
+    showToast('อัปเดตสำเร็จ', 'success');
+  } else {
+    prompt.useCount = 0;
+    prompt.createdAt = new Date().toISOString();
+    prompt.updatedAt = prompt.createdAt;
+    prompts.unshift(prompt);
+    await apiCall('create', { prompt });
+    showToast('สร้าง Prompt สำเร็จ', 'success');
+  }
+  
+  saveToLocal();
+  renderPrompts();
+  closePromptModal();
+  if (!document.getElementById('adminPanel').classList.contains('hidden')) {
+    renderAdminPrompts();
+    loadAdminStats();
+  }
+}
+
+function editPrompt(id) {
+  const p = prompts.find(x => x.id === id);
+  if (p) openPromptModal(p);
+}
+
+function viewPrompt(id) {
+  const prompt = prompts.find(x => x.id === id);
+  if (!prompt) return;
+  
+  currentViewId = id;
+  document.getElementById('viewTitle').textContent = prompt.title;
+  document.getElementById('viewDesc').textContent = prompt.description || '';
+  
+  const vars = extractVariables(prompt.content);
+  const varsContainer = document.getElementById('viewVariables');
+  const varsInputs = document.getElementById('viewVariablesInputs');
+  
+  if (vars.length > 0) {
+    varsContainer.classList.remove('hidden');
+    varsInputs.innerHTML = vars.map(v => `
+      <div>
+        <label class="block text-xs font-medium mb-1" style="color: var(--accent)">${escapeHtml(v)}</label>
+        <input type="text" data-var="${escapeHtml(v)}" placeholder="กรอกค่า..." class="var-input w-full px-3 py-2 bg-input rounded-lg text-sm">
+      </div>
+    `).join('');
+    varsInputs.querySelectorAll('.var-input').forEach(input => {
+      input.addEventListener('input', updateViewContent);
+    });
+  } else {
+    varsContainer.classList.add('hidden');
+  }
+  
+  updateViewContent();
+  document.getElementById('viewModal').classList.remove('hidden');
+}
+
+function updateViewContent() {
+  const prompt = prompts.find(x => x.id === currentViewId);
+  if (!prompt) return;
+  
+  const variables = {};
+  document.querySelectorAll('#viewVariablesInputs .var-input').forEach(input => {
+    variables[input.dataset.var] = input.value;
+  });
+  
+  const processed = processPrompt(prompt.content, variables);
+  document.getElementById('viewContent').innerHTML = highlightVariables(processed);
+}
+
+function closeViewModal() {
+  document.getElementById('viewModal').classList.add('hidden');
+  currentViewId = null;
+}
+
+function editFromView() { const id = currentViewId; closeViewModal(); editPrompt(id); }
+
+async function usePrompt() {
+  const prompt = prompts.find(x => x.id === currentViewId);
+  if (!prompt) return;
+  
+  const variables = {};
+  document.querySelectorAll('#viewVariablesInputs .var-input').forEach(input => {
+    variables[input.dataset.var] = input.value;
+  });
+  
+  const processed = processPrompt(prompt.content, variables);
+  
+  try {
+    await navigator.clipboard.writeText(processed);
+    showToast('คัดลอก Prompt ไปยังคลิปบอร์ดแล้ว ✨', 'success');
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = processed;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('คัดลอกแล้ว', 'success');
+  }
+  
+  prompt.useCount = (parseInt(prompt.useCount) || 0) + 1;
+  await apiCall('incrementUse', { id: prompt.id });
+  saveToLocal();
+  renderPrompts();
+}
+
+function copyProcessedPrompt() {
+  const prompt = prompts.find(x => x.id === currentViewId);
+  if (!prompt) return;
+  const variables = {};
+  document.querySelectorAll('#viewVariablesInputs .var-input').forEach(input => {
+    variables[input.dataset.var] = input.value;
+  });
+  navigator.clipboard.writeText(processPrompt(prompt.content, variables)).then(() => showToast('คัดลอกแล้ว', 'success'));
+}
+
+function copyRawPrompt() {
+  const prompt = prompts.find(x => x.id === currentViewId);
+  if (!prompt) return;
+  navigator.clipboard.writeText(prompt.content).then(() => showToast('คัดลอกต้นฉบับแล้ว', 'success'));
+}
+
+function quickCopy(id) {
+  const prompt = prompts.find(x => x.id === id);
+  if (!prompt) return;
+  navigator.clipboard.writeText(prompt.content).then(() => showToast('คัดลอก Prompt แล้ว', 'success'));
+}
+
+function openDeleteModal(id) { deleteTargetId = id; document.getElementById('deleteModal').classList.remove('hidden'); }
+function closeDeleteModal() { deleteTargetId = null; document.getElementById('deleteModal').classList.add('hidden'); }
+
+async function confirmDelete() {
+  if (!deleteTargetId) return;
+  prompts = prompts.filter(p => p.id !== deleteTargetId);
+  await apiCall('delete', { id: deleteTargetId });
+  saveToLocal();
+  renderPrompts();
+  closeDeleteModal();
+  showToast('ลบสำเร็จ', 'success');
+}
+
+async function toggleFavorite(id) {
+  const p = prompts.find(x => x.id === id);
+  if (!p) return;
+  p.favorite = String(p.favorite) === 'true' ? 'false' : 'true';
+  await apiCall('update', { prompt: p });
+  saveToLocal();
+  renderPrompts();
+}
+
+// ============ Import/Export ============
+function exportData() {
+  const blob = new Blob([JSON.stringify(prompts, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `promptvault-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  showToast('Export สำเร็จ', 'success');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('Invalid format');
+      
+      if (confirm(`พบ ${imported.length} prompts\nกด OK เพื่อรวม, Cancel เพื่อแทนที่ทั้งหมด`)) {
+        const ids = new Set(prompts.map(p => p.id));
+        for (const p of imported) {
+          if (!ids.has(p.id)) {
+            prompts.push(p);
+            await apiCall('create', { prompt: p });
+          }
+        }
+      } else {
+        prompts = imported;
+        await apiCall('clearAll', {});
+        for (const p of imported) await apiCall('create', { prompt: p });
+      }
+      
+      saveToLocal();
+      renderPrompts();
+      showToast(`Import สำเร็จ ${imported.length} รายการ`, 'success');
+    } catch (err) {
+      showToast('ไฟล์ไม่ถูกต้อง: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============ Admin Panel ============
+function openAdminPanel() {
+  if (!adminPassword) {
+    openAdminLogin();
+    return;
+  }
+  document.getElementById('adminPanel').classList.remove('hidden');
+  loadAdminStats();
+  switchAdminTab('overview');
+}
+
+function closeAdminPanel() {
+  document.getElementById('adminPanel').classList.add('hidden');
+}
+
+function switchAdminTab(tab) {
+  const tabs = ['Overview', 'Prompts', 'Categories', 'Security', 'Settings', 'Logs'];
+  tabs.forEach(t => {
+    const content = document.getElementById('adminContent' + t);
+    const tabBtn = document.getElementById('adminTab' + t);
+    if (content) content.classList.add('hidden');
+    if (tabBtn) {
+      tabBtn.classList.remove('active');
+      tabBtn.style.color = 'var(--text-secondary)';
+    }
+  });
+  
+  const tabCap = tab.charAt(0).toUpperCase() + tab.slice(1);
+  const content = document.getElementById('adminContent' + tabCap);
+  const tabBtn = document.getElementById('adminTab' + tabCap);
+  if (content) content.classList.remove('hidden');
+  if (tabBtn) {
+    tabBtn.classList.add('active');
+    tabBtn.style.color = '';
+  }
+  
+  if (tab === 'prompts') renderAdminPrompts();
+  if (tab === 'categories') renderAdminCategories();
+  if (tab === 'settings') updateAdminSettings();
+  if (tab === 'logs') loadAdminLogs();
+  if (tab === 'security') {
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('passwordChangeResult').classList.add('hidden');
+  }
+}
+
+function loadAdminStats() {
+  const categories = {};
+  let totalUses = 0;
+  let favorites = 0;
+  
+  prompts.forEach(p => {
+    if (p.category) categories[p.category] = (categories[p.category] || 0) + 1;
+    totalUses += parseInt(p.useCount) || 0;
+    if (String(p.favorite) === 'true') favorites++;
+  });
+  
+  adminStats = {
+    total: prompts.length,
+    totalUses: totalUses,
+    favorites: favorites,
+    categories: categories,
+    categoryCount: Object.keys(categories).length,
+    topUsed: [...prompts].sort((a, b) => (parseInt(b.useCount) || 0) - (parseInt(a.useCount) || 0)).slice(0, 10)
+  };
+  
+  renderAdminOverview();
+}
+
+function renderAdminOverview() {
+  document.getElementById('adminStatTotal').textContent = adminStats.total || 0;
+  document.getElementById('adminStatUses').textContent = adminStats.totalUses || 0;
+  document.getElementById('adminStatCategories').textContent = adminStats.categoryCount || 0;
+  document.getElementById('adminStatFavorites').textContent = adminStats.favorites || 0;
+  
+  const categoryChart = document.getElementById('categoryChart');
+  const categories = adminStats.categories || {};
+  const maxCount = Math.max(...Object.values(categories), 1);
+  
+  if (Object.keys(categories).length === 0) {
+    categoryChart.innerHTML = '<p class="text-sm text-center py-8" style="color: var(--text-muted)">ยังไม่มีข้อมูล</p>';
+  } else {
+    categoryChart.innerHTML = Object.entries(categories)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, count]) => `
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium">${escapeHtml(cat)}</span>
+            <span style="color: var(--text-muted)">${count}</span>
+          </div>
+          <div class="h-2 rounded-full" style="background: var(--bg-tertiary)">
+            <div class="chart-bar h-full" style="width: ${(count / maxCount * 100)}%"></div>
+          </div>
+        </div>
+      `).join('');
+  }
+  
+  const topUsedChart = document.getElementById('topUsedChart');
+  const topUsed = adminStats.topUsed || [];
+  
+  if (topUsed.length === 0) {
+    topUsedChart.innerHTML = '<p class="text-sm text-center py-8" style="color: var(--text-muted)">ยังไม่มีข้อมูล</p>';
+  } else {
+    topUsedChart.innerHTML = topUsed.slice(0, 5).map((p, i) => `
+      <div class="flex items-center gap-3 p-2 rounded-lg" style="background: var(--bg-tertiary)">
+        <div class="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center text-white font-bold text-sm">${i + 1}</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-medium text-sm truncate">${escapeHtml(p.title)}</p>
+          <p class="text-xs" style="color: var(--text-muted)">${p.category || 'ไม่มีหมวดหมู่'}</p>
+        </div>
+        <div class="text-right">
+          <p class="font-bold" style="color: var(--accent)">${p.useCount || 0}</p>
+          <p class="text-xs" style="color: var(--text-muted)">ครั้ง</p>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function renderAdminPrompts() {
+  const search = (document.getElementById('adminSearchInput').value || '').toLowerCase();
+  const filtered = prompts.filter(p => 
+    !search || 
+    (p.title || '').toLowerCase().includes(search) ||
+    (p.category || '').toLowerCase().includes(search)
+  );
+  
+  const tbody = document.getElementById('adminPromptsTable');
+  
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8" style="color: var(--text-muted)">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(p => {
+    const date = new Date(p.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+    const isFav = String(p.favorite) === 'true';
+    
+    return `
+      <tr>
+        <td class="font-medium">${escapeHtml(p.title)}</td>
+        <td><span class="px-2 py-0.5 text-xs rounded-full" style="background: rgba(139,92,246,0.15); color: var(--accent)">${escapeHtml(p.category || '-')}</span></td>
+        <td class="font-medium">${p.useCount || 0}</td>
+        <td>${isFav ? '⭐' : '-'}</td>
+        <td class="text-xs" style="color: var(--text-muted)">${date}</td>
+        <td>
+          <div class="flex gap-1">
+            <button onclick="editPrompt('${p.id}')" class="p-1.5 hover:bg-violet-100 rounded" title="แก้ไข">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button onclick="openDeleteModal('${p.id}')" class="p-1.5 hover:bg-rose-100 rounded" title="ลบ">
+              <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderAdminCategories() {
+  const categories = {};
+  prompts.forEach(p => {
+    if (p.category) {
+      if (!categories[p.category]) categories[p.category] = { count: 0, uses: 0 };
+      categories[p.category].count++;
+      categories[p.category].uses += parseInt(p.useCount) || 0;
+    }
+  });
+  
+  const container = document.getElementById('adminCategoriesList');
+  
+  if (Object.keys(categories).length === 0) {
+    container.innerHTML = '<p class="text-sm text-center py-8 col-span-2" style="color: var(--text-muted)">ยังไม่มีหมวดหมู่</p>';
+    return;
+  }
+  
+  container.innerHTML = Object.entries(categories)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([cat, data]) => `
+      <div class="gradient-border p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-bold">${escapeHtml(cat)}</h4>
+          <span class="px-2 py-0.5 text-xs rounded-full" style="background: rgba(139,92,246,0.15); color: var(--accent)">${data.count} prompts</span>
+        </div>
+        <div class="flex gap-4 text-sm" style="color: var(--text-muted)">
+          <span>📝 ${data.count} รายการ</span>
+          <span>⚡ ${data.uses} ครั้ง</span>
+        </div>
+      </div>
+    `).join('');
+}
+
+function updateAdminSettings() {
+  document.getElementById('adminApiUrl').value = apiUrl;
+  document.getElementById('adminSettingsMode').textContent = apiUrl ? '🟢 Google Sheets' : '🟡 Local Only';
+  document.getElementById('adminSettingsCount').textContent = prompts.length + ' prompts';
+  const lastSync = localStorage.getItem('promptvault_last_sync');
+  document.getElementById('adminSettingsLastSync').textContent = lastSync ? new Date(lastSync).toLocaleString('th-TH') : 'ยังไม่ซิงค์';
+}
+
+async function adminSaveApiUrl() {
+  const url = document.getElementById('adminApiUrl').value.trim();
+  const result = document.getElementById('adminConnectionResult');
+  result.classList.remove('hidden');
+  result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: var(--bg-tertiary)">⏳ กำลังทดสอบ...</div>';
+  
+  if (!url) {
+    apiUrl = '';
+    localStorage.removeItem('promptvault_api_url');
+    updateConnectionStatus(false);
+    result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(245, 158, 11, 0.1); color: #d97706">✅ เปลี่ยนเป็นโหมด Local แล้ว</div>';
+    updateAdminSettings();
+    return;
+  }
+  
+  try {
+    const res = await fetch(url + '?action=list');
+    const json = await res.json();
+    if (json.success) {
+      apiUrl = url;
+      localStorage.setItem('promptvault_api_url', url);
+      prompts = json.data || [];
+      saveToLocal();
+      renderPrompts();
+      updateConnectionStatus(true);
+      result.innerHTML = `<div class="p-3 rounded-xl text-sm" style="background: rgba(16, 185, 129, 0.1); color: #059669">✅ เชื่อมต่อสำเร็จ! ${json.data.length} prompts</div>`;
+      showToast('บันทึกสำเร็จ', 'success');
+      updateAdminSettings();
+    } else {
+      throw new Error(json.error);
+    }
+  } catch (err) {
+    result.innerHTML = `<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ ${err.message}</div>`;
+  }
+}
+
+function adminDisconnect() {
+  if (!confirm('ยกเลิกการเชื่อมต่อ?')) return;
+  apiUrl = '';
+  localStorage.removeItem('promptvault_api_url');
+  updateConnectionStatus(false);
+  document.getElementById('adminApiUrl').value = '';
+  updateAdminSettings();
+  showToast('ยกเลิกการเชื่อมต่อแล้ว', 'success');
+}
+
+// ============ Change Password ============
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const current = document.getElementById('currentPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
+  const result = document.getElementById('passwordChangeResult');
+  
+  result.classList.remove('hidden');
+  
+  if (newPass !== confirm) {
+    result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ รหัสผ่านใหม่ไม่ตรงกัน</div>';
+    return;
+  }
+  
+  if (newPass.length < 4) {
+    result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัว</div>';
+    return;
+  }
+  
+  if (!apiUrl) {
+    if (current !== 'admin123') {
+      result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ รหัสผ่านปัจจุบันไม่ถูกต้อง (Local: admin123)</div>';
+      return;
+    }
+    result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(245, 158, 11, 0.1); color: #d97706">⚠️ โหมด Local ไม่สามารถเปลี่ยนรหัสผ่านถาวรได้<br>กรุณาเชื่อมต่อ Google Sheets ก่อน</div>';
+    return;
+  }
+  
+  result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: var(--bg-tertiary)">⏳ กำลังเปลี่ยนรหัสผ่าน...</div>';
+  
+  try {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'updatePassword',
+        currentPassword: current,
+        newPassword: newPass,
+        password: current
+      })
+    });
+    const json = await res.json();
+    
+    if (json.success) {
+      adminPassword = newPass;
+      result.innerHTML = '<div class="p-3 rounded-xl text-sm" style="background: rgba(16, 185, 129, 0.1); color: #059669">✅ เปลี่ยนรหัสผ่านสำเร็จ!<br><span class="text-xs">รหัสผ่านใหม่จะถูกเก็บใน Google Sheets (Settings Sheet)</span></div>';
+      showToast('🔐 เปลี่ยนรหัสผ่านสำเร็จ', 'success');
+      document.getElementById('currentPassword').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+    } else {
+      result.innerHTML = `<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ ${json.error || 'เปลี่ยนรหัสผ่านไม่สำเร็จ'}</div>`;
+    }
+  } catch (err) {
+    result.innerHTML = `<div class="p-3 rounded-xl text-sm" style="background: rgba(239, 68, 68, 0.1); color: #dc2626">❌ เกิดข้อผิดพลาด: ${err.message}</div>`;
+  }
+}
+
+// ============ Admin Actions ============
+async function adminSeedSample() {
+  if (!confirm('สร้างข้อมูลตัวอย่าง 5 prompts?')) return;
+  
+  const samples = [
+    { title: 'เขียนบทความ SEO', description: 'สร้างบทความ SEO', content: 'เขียนบทความเรื่อง "{{topic}}" สำหรับ {{audience}}', category: 'Marketing', tags: 'seo,content', favorite: true },
+    { title: 'Code Review', description: 'ตรวจสอบโค้ด', content: 'Review this {{language}} code:\n{{code}}', category: 'Coding', tags: 'code,review', favorite: true },
+    { title: 'สรุปเนื้อหา', description: 'สรุปเอกสาร', content: 'สรุปเอกสาร:\n{{document}}', category: 'Productivity', tags: 'summary', favorite: false },
+    { title: 'Email Marketing', description: 'เขียนอีเมล', content: 'เขียนอีเมลสำหรับ {{product}}', category: 'Marketing', tags: 'email,sales', favorite: false },
+    { title: 'วิเคราะห์ข้อมูล', description: 'วิเคราะห์ธุรกิจ', content: 'วิเคราะห์:\n{{data}}', category: 'Business', tags: 'analysis', favorite: false }
+  ];
+  
+  for (const s of samples) {
+    const prompt = {
+      ...s,
+      id: 'prm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      useCount: 0,
+      favorite: s.favorite ? 'true' : 'false',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    prompts.push(prompt);
+    await apiCall('create', { prompt });
+  }
+  
+  saveToLocal();
+  renderPrompts();
+  loadAdminStats();
+  showToast('สร้างข้อมูลตัวอย่างสำเร็จ', 'success');
+}
+
+async function adminClearAll() {
+  if (!confirm('⚠️ ลบข้อมูลทั้งหมด?')) return;
+  if (!confirm('ยืนยันอีกครั้ง: ลบข้อมูลทั้งหมดจริงๆ?')) return;
+  
+  prompts = [];
+  await apiCall('clearAll', {});
+  saveToLocal();
+  renderPrompts();
+  loadAdminStats();
+  showToast('ลบข้อมูลทั้งหมดแล้ว', 'success');
+}
+
+async function loadAdminLogs() {
+  const tbody = document.getElementById('adminLogsTable');
+  
+  if (apiUrl) {
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'getLogs', password: adminPassword })
+      });
+      const json = await res.json();
+      if (json.success && json.data.length > 0) {
+        tbody.innerHTML = json.data.map(log => {
+          const time = new Date(log.timestamp).toLocaleString('th-TH');
+          const actionColor = {
+            'CREATE': 'text-emerald-600',
+            'UPDATE': 'text-blue-600',
+            'DELETE': 'text-rose-600',
+            'CLEAR_ALL': 'text-rose-600',
+            'SEED_SAMPLE': 'text-amber-600',
+            'UPDATE_PASSWORD': 'text-violet-600'
+          }[log.action] || '';
+          
+          return `
+            <tr>
+              <td class="text-xs">${time}</td>
+              <td><span class="px-2 py-0.5 text-xs rounded font-medium ${actionColor}" style="background: var(--bg-tertiary)">${log.action}</span></td>
+              <td class="text-xs font-mono" style="color: var(--text-muted)">${log.itemId || '-'}</td>
+              <td class="text-xs" style="color: var(--text-muted)">${escapeHtml(log.detail || '-')}</td>
+            </tr>
+          `;
+        }).join('');
+        return;
+      }
+    } catch (err) {
+      console.error('Logs error:', err);
+    }
+  }
+  
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8" style="color: var(--text-muted)">ยังไม่มี Logs</td></tr>';
+}
+
+async function adminClearLogs() {
+  if (!confirm('ล้าง Logs ทั้งหมด?')) return;
+  await apiCall('clearLogs', {});
+  loadAdminLogs();
+  showToast('ล้าง Logs แล้ว', 'success');
+}
+
+// ============ Utilities ============
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < (str || '').length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function showToast(message, type = 'info') {
+  const colors = { success: 'bg-emerald-500', error: 'bg-rose-500', warning: 'bg-amber-500', info: 'bg-violet-500' };
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const toast = document.createElement('div');
+  toast.className = `toast flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-white ${colors[type]} min-w-[260px]`;
+  toast.innerHTML = `<span class="text-lg">${icons[type]}</span><span class="text-sm font-medium flex-1">${message}</span>`;
+  document.getElementById('toastContainer').appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'all 0.3s';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+</script>
+
+</body>
+</html>
